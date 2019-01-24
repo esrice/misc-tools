@@ -3,6 +3,7 @@
 import argparse
 import gzip
 import collections
+import sys
 
 """
 A group of samples. The 'name' field is some identifier
@@ -58,11 +59,16 @@ def calculate_mafs(groups, gt_index, individual_fields):
         minor_allele_count = 0
         for member in group.members:
             gt_field = individual_fields[member].split(':')[gt_index]
+            if gt_field == '.':
+                continue
             genotypes = tuple(map(lambda i: int(i),
                 gt_field.replace('/', '|').split('|')))
             total_allele_count += len(genotypes)
             minor_allele_count += sum(genotypes)
-        mafs.append(minor_allele_count / total_allele_count)
+        if total_allele_count == 0:
+            mafs.append('.')
+        else:
+            mafs.append(minor_allele_count / total_allele_count)
     return mafs
 
 def parse_groups_file(groups_file):
@@ -74,7 +80,7 @@ def parse_groups_file(groups_file):
     """
     groups = []
     for line in groups_file:
-        splits = line.split('\t')
+        splits = line.strip().split('\t')
         groups.append(Group(splits[0], splits[1:]))
     return groups
 
@@ -84,9 +90,9 @@ def parse_args():
             'variant in each group.')
     parser.add_argument('vcf', help='The vcf file to analyze. Can be gzipped.')
     parser.add_argument('groups_file', type=argparse.FileType('r'),
-            help='A tab-separated file listing groups, one per line. The '
-            'first field on each line is the name of the group and all '
-            'subsequent fields are the names of individuals in that group.')
+        help='A tab-separated file listing groups, one per '
+        'line. The first field on each line is the name of the group and all '
+        'subsequent fields are the names of individuals in that group.')
     return parser.parse_args()
 
 def main():
@@ -95,9 +101,9 @@ def main():
     groups = parse_groups_file(args.groups_file)
 
     if args.vcf.endswith('.gz'):
-        vcf_file = gzip.open(filename, 'r')
+        vcf_file = gzip.open(args.vcf, 'rt')
     else:
-        vcf_file = open(filename, 'r')
+        vcf_file = open(args.vcf, 'r')
 
     for line in vcf_file:
         if line.startswith('##'):
@@ -107,13 +113,19 @@ def main():
         elif line.startswith('#'):
             # TODO protect against crashing on files without this line
             # this is the one header line we do care about
-            individuals = line.split('\t')[9:]
-            print(make_header(individuals))
+            individuals = line.strip().split('\t')[9:]
+            print(make_header_string(groups))
         else: # this is an actual entry
-            splits = line.split('\t')
+            splits = line.strip().split('\t')
+
             gt_index = gt_index_from_format(splits[8])
-            mafs = calculate_mafs(groups, gt_index, splits[9:])
-            print('\t'.join(splits[:7] + list(map(mafs, lambda i: str(i)))))
+
+            # make a dict mapping individual name to contents of that
+            # individual's field on this line
+            individuals_fields = dict(zip(individuals, splits[9:]))
+
+            mafs = calculate_mafs(groups, gt_index, individuals_fields)
+            print('\t'.join(splits[:7] + list(map(lambda i: str(i), mafs))))
 
 if __name__ == '__main__':
     main()
