@@ -63,14 +63,14 @@ def parse_args():
             'groups and then calculate the minor allele frequency for each '
             'variant in each group.')
     parser.add_argument('vcf', help='The vcf file to analyze. Can be gzipped.')
-    parser.add_argument('groups_file', type=argparse.FileType('r'),
+    parser.add_argument('groups_yaml', type=argparse.FileType('r'),
         help='A yaml file listing groups. See sample file for an example.')
     return parser.parse_args()
 
 def main():
     args = parse_args()
 
-    groups = parse_groups_file(args.groups_file)
+    groups = parse_groups_yaml(args.groups_yaml)
     vcf_file = vcf.Reader(filename=args.vcf)
 
     # add INFO lines to header of vcf_file because it will
