@@ -3,6 +3,7 @@
 import argparse
 import gzip
 import collections
+import yaml
 import sys
 
 """
@@ -10,7 +11,6 @@ A group of samples. The 'name' field is some identifier
 string for the group; the 'members' field is a list of
 the name of each sample in the group.
 """
-Group = collections.namedtuple('Group', ['name', 'members'])
 
 def make_header_string(groups):
     """
@@ -32,6 +32,7 @@ def gt_index_from_format(format_string):
         if field == 'GT':
             return i
     # TODO raise error if none of fields is 'GT'
+Group = collections.namedtuple('Group', ['name', 'abbreviation', 'members'])
 
 def calculate_mafs(groups, gt_index, individual_fields):
     """
@@ -71,17 +72,24 @@ def calculate_mafs(groups, gt_index, individual_fields):
             mafs.append(minor_allele_count / total_allele_count)
     return mafs
 
-def parse_groups_file(groups_file):
+def parse_groups_yaml(groups_yaml):
     """
-    Parses a file listing groups of samples in
-    tab-separated format. First field is name of group;
-    subsequent fields are the names of individuals within
-    that group. Returns a list of Group objects.
+    Parses a file listing groups of samples in yaml format
+    Returns a list of Group objects.
     """
     groups = []
-    for line in groups_file:
-        splits = line.strip().split('\t')
-        groups.append(Group(splits[0], splits[1:]))
+    for group in yaml.load(groups_yaml)['groups']:
+        try:
+            name, abbreviation = group['name'], group['abbreviation']
+            members = group['members']
+        except:
+            print('Groups yaml is missing a field. Aborting.',
+                    file=sys.stderr)
+            sys.exit(1)
+
+        # TODO check to make sure abbreviation is not reserved
+        groups.append(Group(name, abbreviation, members))
+
     return groups
 
 def parse_args():
@@ -90,9 +98,7 @@ def parse_args():
             'variant in each group.')
     parser.add_argument('vcf', help='The vcf file to analyze. Can be gzipped.')
     parser.add_argument('groups_file', type=argparse.FileType('r'),
-        help='A tab-separated file listing groups, one per '
-        'line. The first field on each line is the name of the group and all '
-        'subsequent fields are the names of individuals in that group.')
+        help='A yaml file listing groups. See sample file for an example.')
     return parser.parse_args()
 
 def main():
