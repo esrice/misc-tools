@@ -14,44 +14,6 @@ the name of each sample in the group.
 """
 Group = collections.namedtuple('Group', ['name', 'abbreviation', 'members'])
 
-def calculate_mafs(groups, gt_index, individual_fields):
-    """
-    Calculate the minor allele frequency within each group
-    given the list of groups, the index of the genotype
-    field of the format strings, and a dict mapping
-    individual name string to individual format string.
-
-    Arguments:
-    - groups: an ordered list of Group objects
-    - gt_index: the index of the genotype field of the
-      format string. E.g., if FORMAT='GT:GQ:DP:HQ', this
-      will be = 0
-    - individual_fields: an ordered list of the raw
-      contents of each individual's field, e.g.,
-      '0|1:1:51:51'
-
-    Returns: a list of minor allele frequencies with each
-             group, in the same order as in the list of
-             groups.
-    """
-    mafs = []
-    for group in groups:
-        total_allele_count = 0
-        minor_allele_count = 0
-        for member in group.members:
-            gt_field = individual_fields[member].split(':')[gt_index]
-            if gt_field == '.':
-                continue
-            genotypes = tuple(map(lambda i: int(i),
-                gt_field.replace('/', '|').split('|')))
-            total_allele_count += len(genotypes)
-            minor_allele_count += sum(genotypes)
-        if total_allele_count == 0:
-            mafs.append('.')
-        else:
-            mafs.append(minor_allele_count / total_allele_count)
-    return mafs
-
 def parse_groups_yaml(groups_yaml):
     """
     Parses a file listing groups of samples in yaml format
@@ -72,6 +34,30 @@ def parse_groups_yaml(groups_yaml):
 
     return groups
 
+def calc_group_maf(group, vcf_record):
+    """
+    Calculate the minor allele frequency for a given group
+    of samples.
+
+    Arguments:
+    - group: a Group containing the samples to examine
+    - vcf_record: a vcf Record containing the calls
+    """
+    # we're only dealing with biallelic sites for now
+    if len(vcf_record.ALT) > 1:
+        return '.'
+
+    # the gt_type field is 0 for hom ref, 1 for het, 2 for
+    # hom alt, and None for no call, so this is some super
+    # convenient math
+    calls = map(lambda s: vcf_record.genotype(s).gt_type, group.members)
+    calls = list(filter(lambda c: c is not None, calls))
+
+    if len(calls) == 0:
+        return '.'
+    else:
+        return sum(calls)/len(calls)
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Group samples in a vcf into '
             'groups and then calculate the minor allele frequency for each '
@@ -85,21 +71,22 @@ def main():
     args = parse_args()
 
     groups = parse_groups_file(args.groups_file)
+    vcf_file = vcf.Reader(filename=args.vcf)
 
-    if args.vcf.endswith('.gz'):
-        vcf_file = vcf.Reader(gzip.open(args.vcf, 'rt'))
-    else:
-        vcf_file = vcf.Reader(open(args.vcf, 'r'))
+    # add INFO lines to header of vcf_file because it will
+    # be used as a template for the output file
+    for group in groups:
+        vcf_file.infos[group.abbreviation] = vcf.parser._Info(
+                group.abbreviation, 1, 'Float',
+                'MAF of variant among group {}'.format(group.name), None, None)
+
+    vcf_writer = vcf.Writer(sys.stdout, vcf_file)
 
     for record in vcf_file:
-        gt_index = gt_index_from_format(splits[8])
-
-        # make a dict mapping individual name to contents of that
-        # individual's field on this line
-        individuals_fields = dict(zip(individuals, splits[9:]))
-
-        mafs = calculate_mafs(groups, gt_index, individuals_fields)
-        print('\t'.join(splits[:7] + list(map(lambda i: str(i), mafs))))
+        if len(record.ALT) == 1: # only dealing with biallelic sites for now
+            mafs = {g.abbreviation: calc_group_maf(g, record) for g in groups}
+            record.INFO.update(mafs)
+            vcf_writer.write_record(record)
 
 if __name__ == '__main__':
     main()
