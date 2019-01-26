@@ -4,6 +4,7 @@ import argparse
 import gzip
 import collections
 import yaml
+import vcf
 import sys
 
 """
@@ -11,27 +12,6 @@ A group of samples. The 'name' field is some identifier
 string for the group; the 'members' field is a list of
 the name of each sample in the group.
 """
-
-def make_header_string(groups):
-    """
-    Given a list of Group objects, make a header string for
-    the output that lists all the default field names
-    followed by each group name.
-    """
-    default_fields = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER']
-    group_name_fields = list(map(lambda g: g.name, groups))
-    return '\t'.join(default_fields + group_name_fields)
-
-def gt_index_from_format(format_string):
-    """
-    Given a format string, return the index of the GT
-    field. E.g., if FORMAT='GT:GQ:DP:HQ', this function
-    will return 0.
-    """
-    for i, field in enumerate(format_string.split(':')):
-        if field == 'GT':
-            return i
-    # TODO raise error if none of fields is 'GT'
 Group = collections.namedtuple('Group', ['name', 'abbreviation', 'members'])
 
 def calculate_mafs(groups, gt_index, individual_fields):
@@ -107,31 +87,19 @@ def main():
     groups = parse_groups_file(args.groups_file)
 
     if args.vcf.endswith('.gz'):
-        vcf_file = gzip.open(args.vcf, 'rt')
+        vcf_file = vcf.Reader(gzip.open(args.vcf, 'rt'))
     else:
-        vcf_file = open(args.vcf, 'r')
+        vcf_file = vcf.Reader(open(args.vcf, 'r'))
 
-    for line in vcf_file:
-        if line.startswith('##'):
-            # this is one of the many header lines we don't
-            # care about
-            pass
-        elif line.startswith('#'):
-            # TODO protect against crashing on files without this line
-            # this is the one header line we do care about
-            individuals = line.strip().split('\t')[9:]
-            print(make_header_string(groups))
-        else: # this is an actual entry
-            splits = line.strip().split('\t')
+    for record in vcf_file:
+        gt_index = gt_index_from_format(splits[8])
 
-            gt_index = gt_index_from_format(splits[8])
+        # make a dict mapping individual name to contents of that
+        # individual's field on this line
+        individuals_fields = dict(zip(individuals, splits[9:]))
 
-            # make a dict mapping individual name to contents of that
-            # individual's field on this line
-            individuals_fields = dict(zip(individuals, splits[9:]))
-
-            mafs = calculate_mafs(groups, gt_index, individuals_fields)
-            print('\t'.join(splits[:7] + list(map(lambda i: str(i), mafs))))
+        mafs = calculate_mafs(groups, gt_index, individuals_fields)
+        print('\t'.join(splits[:7] + list(map(lambda i: str(i), mafs))))
 
 if __name__ == '__main__':
     main()
