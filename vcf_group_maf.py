@@ -56,7 +56,7 @@ def calc_group_maf(group, vcf_record):
     if len(calls) == 0:
         return '.'
     else:
-        return sum(calls)/len(calls)
+        return sum(calls)/(len(calls)*2)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Group samples in a vcf into '
