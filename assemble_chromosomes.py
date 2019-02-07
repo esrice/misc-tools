@@ -2,13 +2,14 @@
 
 import argparse
 import sys
+import pyfaidx
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Given a fasta containing '
             'scaffolds and a file laying out scaffolds into chromosomes, '
             'output a fasta of chromosomes.')
-    parser.add_argument('scaffolds_fasta', help='a fasta file containing '
-            'scaffolds to be assembled into chromosomes')
+    parser.add_argument('scaffolds_fasta', type=pyfaidx.Fasta, help='a fasta '
+            'file containing scaffolds to be assembled into chromosomes')
     parser.add_argument('layout_file', type=argparse.FileType('r'),
             help='a file with two columns: first is the name of a chromosome, '
             'second is a comma-separated list of scaffolds in that chromosome '
@@ -18,6 +19,8 @@ def parse_args():
             'orientation.')
     parser.add_argument('-p', '--path-to-samtools', default='samtools',
             help='the path to the samtools executable, if it\'s not in $PATH')
+    parser.add_argument('-g', '--gap-size', type=int, default=1000,
+            help='number of N\'s to place between scaffolds')
     return parser.parse_args()
 
 """
@@ -58,16 +61,17 @@ def parse_scaffold_list(scaffold_list_string):
     return scaffolds
 
 def main():
+    # TODO refactor to clean up main method
     args = parse_args()
 
     # set of string IDs of scaffolds that have been placed
     # onto chromosomes, so that all unplaced scaffolds can
     # be printed out at the end
-    used_scaffolds = set()
+    assigned_scaffolds = set()
 
     for line_number, line in enumerate(args.layout_file):
-        try:
-            chrom, scaffolds = line.strip().split()
+        try: # make sure there are the right number of column
+            chromosome_name, scaffolds = line.strip().split()
             scaffolds = parse_scaffolds_list(scaffolds)
         except ValueError:
             print('FATAL: Misformatted layout file on line {}'
@@ -76,11 +80,34 @@ def main():
 
         chromosome_sequence = ''
         for scaffold_number, scaffold in enumerate(scaffolds):
-            # TODO start here
-            # 1. Append some 'N's if scaffold_number != 0
-            # 2. Get sequence using samtools faidx
-            # 3. Append sequence to chromosome
-        # 4. format and print fasta entry
+            # add a gap if this isn't the first scaffold
+            if scaffold_number != 0:
+                chromosome_sequence += 'N' * args.gap_size
+
+            # get sequence using samtools faidx
+            try:
+                this_scaffold_sequence = args.scaffolds_fasta[scaffold.name]
+            except KeyError:
+                print('FATAL: no sequence with ID "{}" in input'.format(
+                    scaffold.name, file=sys.stderr))
+                sys.exit(1)
+
+            # add scaffold to chromosome
+            if scaffold.orientation:
+                chromosome_sequence += this_scaffold_sequence.seq
+            else: # reverse complement sequence if necessary
+                chromosome_sequence += (-this_scaffold_sequence).seq
+
+            # take a note that this scaffold has been
+            # assigned to a chromosome
+            assigned_scaffolds.add(scaffold.name)
+
+        # TODO format and print (chromosome_name, chromosome_sequence)
+
+    # loop through fasta file outputting all unplaced scaffolds
+    for scaffold in args.scaffolds_fasta:
+        if scaffold.name not in assigned_scaffolds:
+            pass # TODO format and print (scaffold.name, scaffold.seq)
 
 if __name__ == '__main__':
     main()
