@@ -3,6 +3,9 @@
 import argparse
 import sys
 import pyfaidx
+from collections import namedtuple
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Given a fasta containing '
@@ -17,8 +20,6 @@ def parse_args():
             'indicates that this chromosome is made up of scaf5 first in the '
             'forward orientation, followed by scaf2 in the reverse complement '
             'orientation.')
-    parser.add_argument('-p', '--path-to-samtools', default='samtools',
-            help='the path to the samtools executable, if it\'s not in $PATH')
     parser.add_argument('-g', '--gap-size', type=int, default=1000,
             help='number of N\'s to place between scaffolds')
     return parser.parse_args()
@@ -31,7 +32,7 @@ Fields:
 """
 Scaffold = namedtuple('Scaffold', ['name', 'orientation'])
 
-def parse_scaffold_list(scaffold_list_string):
+def parse_scaffolds_list(scaffold_list_string):
     """
     Given a comma-separated list of scaffolds and their
     orientations, turn it into a list of Scaffold objects
@@ -45,8 +46,8 @@ def parse_scaffold_list(scaffold_list_string):
     """
     scaffold_strings = scaffold_list_string.split(',')
     scaffolds = []
-    for scaffold in scaffold_strings:
-        name, orientation = scaffolds.split(':')
+    for scaffold_string in scaffold_strings:
+        name, orientation = scaffold_string.split(':')
         if orientation == '+':
             orientation = True
         elif orientation == '-':
@@ -61,7 +62,6 @@ def parse_scaffold_list(scaffold_list_string):
     return scaffolds
 
 def main():
-    # TODO refactor to clean up main method
     args = parse_args()
 
     # set of string IDs of scaffolds that have been placed
@@ -70,7 +70,7 @@ def main():
     assigned_scaffolds = set()
 
     for line_number, line in enumerate(args.layout_file):
-        try: # make sure there are the right number of column
+        try: # make sure there are the right number of columns
             chromosome_name, scaffolds = line.strip().split()
             scaffolds = parse_scaffolds_list(scaffolds)
         except ValueError:
@@ -88,26 +88,29 @@ def main():
             try:
                 this_scaffold_sequence = args.scaffolds_fasta[scaffold.name]
             except KeyError:
-                print('FATAL: no sequence with ID "{}" in input'.format(
-                    scaffold.name, file=sys.stderr))
+                eprint('FATAL: no sequence with ID "{}" in input'.format(
+                    scaffold.name))
                 sys.exit(1)
 
             # add scaffold to chromosome
             if scaffold.orientation:
-                chromosome_sequence += this_scaffold_sequence.seq
+                chromosome_sequence += this_scaffold_sequence[:].seq
             else: # reverse complement sequence if necessary
-                chromosome_sequence += (-this_scaffold_sequence).seq
+                chromosome_sequence += (-this_scaffold_sequence[:]).seq
 
             # take a note that this scaffold has been
             # assigned to a chromosome
             assigned_scaffolds.add(scaffold.name)
 
-        # TODO format and print (chromosome_name, chromosome_sequence)
+        # format and print chromosome
+        print(SeqRecord(Seq(chromosome_sequence), id=chromosome_name,
+            description='').format('fasta'))
 
     # loop through fasta file outputting all unplaced scaffolds
     for scaffold in args.scaffolds_fasta:
         if scaffold.name not in assigned_scaffolds:
-            pass # TODO format and print (scaffold.name, scaffold.seq)
+            print(SeqRecord(Seq(scaffold[:].seq), id=scaffold.name,
+                description='').format('fasta'))
 
 if __name__ == '__main__':
     main()
