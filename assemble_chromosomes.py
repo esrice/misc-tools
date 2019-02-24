@@ -104,13 +104,13 @@ def main():
 
         # format and print chromosome
         print(SeqRecord(Seq(chromosome_sequence), id=chromosome_name,
-            description='').format('fasta'))
+            description='').format('fasta'), end='')
 
     # loop through fasta file outputting all unplaced scaffolds
     for scaffold in args.scaffolds_fasta:
         if scaffold.name not in assigned_scaffolds:
             print(SeqRecord(Seq(scaffold[:].seq), id=scaffold.name,
-                description='').format('fasta'))
+                description='').format('fasta'), end='')
 
 if __name__ == '__main__':
     main()
