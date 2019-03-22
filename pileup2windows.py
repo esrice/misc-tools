@@ -119,16 +119,17 @@ def main():
     # running counts of number of times we observe positions matching these
     # descriptions:
     hom_ref_count, het_count, hom_alt_count = 0, 0, 0
-    last_chrom = ''
+    last_chrom, last_position = '', 0
     for pile in parse_pileup(sys.stdin, args.min_coverage, args.max_coverage):
         chrom, position, number_ref_reads, number_alt_reads = pile
 
         # we are on a new chromosome, so report stats for the last window on
         # the previous chromosome
-        if chrom != last_chrom and last_chrom != '':
-            print_window_stats(hom_ref_count, het_count, hom_alt_count,
-                    last_chrom, window_start, position-1,
-                    args.min_fraction_window)
+        if chrom != last_chrom:
+            if last_chrom != '':
+                print_window_stats(hom_ref_count, het_count, hom_alt_count,
+                        last_chrom, window_start, last_position,
+                        args.min_fraction_window)
             last_chrom = chrom
             window_start = position
             hom_ref_count, het_count, hom_alt_count = 0, 0, 0
@@ -150,6 +151,8 @@ def main():
             het_count += 1
         else:
             hom_alt_count += 1
+
+        last_position = position
 
     # don't forget the last window!
     print_window_stats(hom_ref_count, het_count, hom_alt_count, last_chrom,
