@@ -3,7 +3,8 @@
 import argparse
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='')
+    parser = argparse.ArgumentParser(description='Make a circos plot from '
+            'mashmap alignments.')
     parser.add_argument('mashmap', type=argparse.FileType('r'),
             help='output of mashmap')
     parser.add_argument('-p', '--output-prefix', default='out',
@@ -53,6 +54,18 @@ def chr_sort_key(sequence_name):
 
 def mash_to_karyotype(mash_file, karyotype_outfile, query_color='orange',
         reference_color='green'):
+    """
+    Given a mashmap output file, use it to make the
+    karyotype input file to mashmap.
+
+    Arguments:
+    * mash_file: readable File pointing to mashmap output
+    * karyotype_outfile: writable File to put lists of
+      reference and query sequences in
+    * query_color, reference_color: colors to use for
+      differentiating query sequences from reference
+      sequences in circos plot
+    """
     # read through the mashmap output to build dicts of
     # sequence names to sequence lengths for both the
     # query assembly and the reference assembly
@@ -70,14 +83,15 @@ def mash_to_karyotype(mash_file, karyotype_outfile, query_color='orange',
         if not reference_name in reference_seq_sizes:
             reference_seq_sizes[reference_name] = reference_len
 
+    # print a line for each chromosome in the query and each in the ref
     for query_name in sorted(query_seq_sizes.keys(), key=chr_sort_key):
         query_length = query_seq_sizes[query_name]
-        print(' '.join(map(str, ['chr', '-', query_name,
+        print(' '.join(map(str, ['chr', '-', query_name + '_qry',
             query_name.lstrip('chr'), 1, query_length, query_color])),
             file=karyotype_outfile)
     for reference_name in sorted(reference_seq_sizes.keys(), key=chr_sort_key):
         reference_length = reference_seq_sizes[reference_name]
-        print(' '.join(map(str, ['chr', '-', reference_name,
+        print(' '.join(map(str, ['chr', '-', reference_name + '_ref',
             reference_name.lstrip('chr'), 1, reference_length,
             reference_color])), file=karyotype_outfile)
 
