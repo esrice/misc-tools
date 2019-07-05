@@ -95,7 +95,8 @@ def mash_to_circos(mash_file, karyotype_outfile, links_outfile,
         print(' '.join(map(str, ['chr', '-', query_name + '_qry',
             query_name.lstrip('chr'), 1, query_length, query_color])),
             file=karyotype_outfile)
-    for reference_name in sorted(reference_seq_sizes.keys(), key=chr_sort_key):
+    for reference_name in sorted(reference_seq_sizes.keys(), key=chr_sort_key,
+            reverse=True):
         reference_length = reference_seq_sizes[reference_name]
         print(' '.join(map(str, ['chr', '-', reference_name + '_ref',
             reference_name.lstrip('chr'), 1, reference_length,
