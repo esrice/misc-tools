@@ -52,16 +52,18 @@ def chr_sort_key(sequence_name):
     else:
         return 1000
 
-def mash_to_karyotype(mash_file, karyotype_outfile, query_color='orange',
-        reference_color='green'):
+def mash_to_circos(mash_file, karyotype_outfile, links_outfile,
+        query_color='orange', reference_color='green'):
     """
     Given a mashmap output file, use it to make the
-    karyotype input file to mashmap.
+    karyotype and links input files to mashmap.
 
     Arguments:
     * mash_file: readable File pointing to mashmap output
     * karyotype_outfile: writable File to put lists of
       reference and query sequences in
+    * links_outfile: writeable File to put alignment links
+      from mashmap alignment into
     * query_color, reference_color: colors to use for
       differentiating query sequences from reference
       sequences in circos plot
@@ -72,16 +74,20 @@ def mash_to_karyotype(mash_file, karyotype_outfile, query_color='orange',
     query_seq_sizes = {}
     reference_seq_sizes = {}
     for line in mash_file:
-        splits = line.split(' ')
-        query_name = splits[0]
-        query_len = int(splits[1])
-        reference_name = splits[5]
-        reference_len = int(splits[6])
+        splits = line.strip().split(' ')
+        query_name, query_len = splits[0], int(splits[1])
+        query_start, query_end = int(splits[2]), int(splits[3])
+        reference_name, reference_len = splits[5], int(splits[6])
+        reference_start, reference_end = int(splits[7]), int(splits[8])
 
         if not query_name in query_seq_sizes:
             query_seq_sizes[query_name] = query_len
         if not reference_name in reference_seq_sizes:
             reference_seq_sizes[reference_name] = reference_len
+
+        print(' '.join(map(str, [query_name + '_qry', query_start, query_end,
+            reference_name + '_ref', reference_start, reference_end])),
+            file=links_outfile)
 
     # print a line for each chromosome in the query and each in the ref
     for query_name in sorted(query_seq_sizes.keys(), key=chr_sort_key):
@@ -98,7 +104,8 @@ def mash_to_karyotype(mash_file, karyotype_outfile, query_color='orange',
 def main():
     args = parse_args()
     karyotype_file = open(args.output_prefix + '.karyotype', 'w')
-    mash_to_karyotype(args.mashmap, karyotype_file)
+    links_file = open(args.output_prefix + '.links', 'w')
+    mash_to_circos(args.mashmap, karyotype_file, links_file)
 
 if __name__ == "__main__":
     main()
