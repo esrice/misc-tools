@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 
 import argparse
+from collections import defaultdict
 import textwrap
 
 import screed
 
+
 def breaks_type(filename):
     with open(filename, 'r') as breaks_file:
-        contigs_to_break = {}
+        contigs_to_break = defaultdict(list)
         for line in (l for l in breaks_file if not l.startswith('#')):
             splits = line.strip().split()
-            contigs_to_break[splits[0]] = (splits[1],
-                                           int(splits[2]),
-                                           int(splits[3]))
+            contigs_to_break[splits[0]].append((splits[1],
+                                                int(splits[2]),
+                                                int(splits[3])))
         return contigs_to_break
 
 

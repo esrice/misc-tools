@@ -39,10 +39,10 @@ def compare_records(record1, record2, contig_index):
     if record1.CHROM != record2.CHROM:
         return contig_index[record1.CHROM] - contig_index[record2.CHROM]
     else:
-        if ((record1.affected_start >= record2.affected_start
-             and record1.affected_start <= record2.affected_end)
-            or (record1.affected_end >= record2.affected_start
-                and record1.affected_end <= record2.affected_end)):
+        if ((record1.POS >= record2.POS
+             and record1.POS <= record2.sv_end)
+            or (record1.sv_end >= record2.POS
+                and record1.sv_end <= record2.sv_end)):
             return 0
         else:
             return record1.POS - record2.POS
@@ -70,22 +70,18 @@ def reciprocal_overlap(record1, record2, min_reciprocal_overlap=0.5):
             sufficient size between the two records
     """
     if record1.CHROM != record2.CHROM:
-        return None
+        return 0
 
-    r1_deletion_size = record1.affected_end - record1.affected_start
-    r2_deletion_size = record2.affected_end - record2.affected_start
+    r1_deletion_size = record1.sv_end - record1.POS
+    r2_deletion_size = record2.sv_end - record2.POS
 
-    overlap_start = max(record1.affected_start, record2.affected_start)
-    overlap_end = min(record1.affected_end, record2.affected_end)
+    overlap_start = max(record1.POS, record2.POS)
+    overlap_end = min(record1.sv_end, record2.sv_end)
     overlap_size = overlap_end - overlap_start
     reciprocal_overlap = min(overlap_size/r1_deletion_size,
                              overlap_size/r2_deletion_size)
 
-    if overlap_size <= 0 or reciprocal_overlap < min_reciprocal_overlap:
-        return None
-    else:
-        return (overlap_start, overlap_end)
-
+    return reciprocal_overlap
 
 def call_type_key(call):
     if call.gt_type is None:
@@ -138,7 +134,7 @@ def merge_records(record1, record2, sample_index_key):
     # template for the new record
     small_record, big_record = sorted(
             [record1, record2],
-            key=lambda r: r.affected_end - r.affected_start
+            key=lambda r: r.sv_end - r.POS
     )
 
     # sort the calls by sample index, and then merge each pair of calls
@@ -156,7 +152,9 @@ def merge_records(record1, record2, sample_index_key):
 
 def merge_all_deletions(reader1, reader2, min_reciprocal_overlap=0.5):
     # god help us if the VCFs have headers in different orders
-    contig_index = {k: i for i, k in enumerate(list(reader1.contigs.keys()))}
+    contig_index = {k: i for i, k in enumerate(reversed(
+        reader1.contigs.keys()
+    ))}
 
     # keep the samples in the order in which they appear in the reader1
     # header
@@ -165,18 +163,16 @@ def merge_all_deletions(reader1, reader2, min_reciprocal_overlap=0.5):
 
     try:
         record1, record2 = next(reader1), next(reader2)
-        while True: # TODO please don't do this
+        while True:  # TODO please don't do this
             while compare_records(record1, record2, contig_index) < 0:
                 record1 = next(reader1)
             while compare_records(record1, record2, contig_index) > 0:
                 record2 = next(reader2)
-            if compare_records(record1, record2, contig_index) == 0:
-                overlap = reciprocal_overlap(record1, record2,
-                                             min_reciprocal_overlap)
-                if overlap is not None:
-                    yield merge_records(record1, record2, sample_index_key)
-                    record1 = next(reader1)
-                    record2 = next(reader2)
+            overlap = reciprocal_overlap(record1, record2)
+            if overlap >= min_reciprocal_overlap:
+                yield merge_records(record1, record2, sample_index_key)
+            record1 = next(reader1)
+            record2 = next(reader2)
     except StopIteration:
         return
 
@@ -189,6 +185,7 @@ def main():
     for record in merge_all_deletions(args.vcf1, args.vcf2,
                                       args.reciprocal_overlap):
         writer.write_record(record)
+        writer.flush()
     writer.close()
 
 
