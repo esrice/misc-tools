@@ -106,7 +106,12 @@ def get_deletion_effects(deletion_record, gff_db, regulatory_margin=2000):
 def annotate_deletion(record, affected_genes, intergenic, regulatory,
                       intronic, coding):
     """ adds INFO fields to a vcf record """
-    # TODO fill this in
+    record.INFO['affected_genes'] = affected_genes
+    record.INFO['intergenic'] = intergenic
+    record.INFO['regulatory'] = regulatory
+    record.INFO['intronic'] = intronic
+    record.INFO['coding'] = coding
+    # TODO this might not actually work...
     return record
 
 
