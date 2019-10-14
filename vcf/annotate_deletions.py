@@ -79,10 +79,10 @@ def get_deletion_effects(deletion_record, gff_db, regulatory_margin=2000):
         if feature.featuretype == 'gene':
             affected_genes.add(feature.attributes['Name'][0].upper())
             intergenic = False
-        elif feature.featuretype == 'intron':
             intronic = True
         elif feature.featuretype == 'CDS':
             coding = True
+            intronic = False
 
     # next, look for any genes *near* the deletion
     features_near_deletion = itertools.chain(
@@ -99,9 +99,13 @@ def get_deletion_effects(deletion_record, gff_db, regulatory_margin=2000):
     )
     for feature in features_near_deletion:
         if feature.featuretype == 'gene':
-            regulatory = True
-            intergenic = False
-            affected_genes.add(feature.attributes['Name'][0].upper())
+            gene_name = feature.attributes['Name'][0].upper()
+            # only consider this a deletion of a regulatory region if
+            # this gene has not been otherwise affected
+            if gene_name not in affected_genes:
+                regulatory = True
+                intergenic = False
+                affected_genes.add(gene_name)
 
     return affected_genes, intergenic, regulatory, intronic, coding
 
