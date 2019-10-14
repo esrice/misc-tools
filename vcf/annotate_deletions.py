@@ -39,6 +39,9 @@ def gff_type(gff_path):
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('-r', '--regulatory-margin', type=int, default=2000,
+                        help='distance up/downstream of a gene to consider '
+                        'as affecting that gene, in bp [2000]')
     parser.add_argument('vcf', help='the vcf file to annotate',
                         type=lambda f: vcf.Reader(filename=f))
     parser.add_argument('gff', help='annotations of the reference genome, '
@@ -74,7 +77,7 @@ def get_deletion_effects(deletion_record, gff_db, regulatory_margin=2000):
     )
     for feature in features_in_deletion:
         if feature.featuretype == 'gene':
-            affected_genes.add(feature.attributes['Name'])
+            affected_genes.add(feature.attributes['Name'][0].upper())
             intergenic = False
         elif feature.featuretype == 'intron':
             intronic = True
@@ -98,7 +101,7 @@ def get_deletion_effects(deletion_record, gff_db, regulatory_margin=2000):
         if feature.featuretype == 'gene':
             regulatory = True
             intergenic = False
-            affected_genes.add(feature.attributes['Name'])
+            affected_genes.add(feature.attributes['Name'][0].upper())
 
     return affected_genes, intergenic, regulatory, intronic, coding
 
@@ -106,21 +109,83 @@ def get_deletion_effects(deletion_record, gff_db, regulatory_margin=2000):
 def annotate_deletion(record, affected_genes, intergenic, regulatory,
                       intronic, coding):
     """ adds INFO fields to a vcf record """
-    record.INFO['affected_genes'] = affected_genes
-    record.INFO['intergenic'] = intergenic
-    record.INFO['regulatory'] = regulatory
-    record.INFO['intronic'] = intronic
-    record.INFO['coding'] = coding
-    # TODO this might not actually work...
+    record.INFO['affected_genes'] = list(affected_genes)
+    # all these if statements are necessary because pyvcf adds
+    # unnecessary semicolons for false flags and empty fields
+    if intergenic:
+        record.INFO['intergenic'] = True
+    if regulatory:
+        record.INFO['regulatory'] = True
+    if intronic:
+        record.INFO['intronic'] = True
+    if coding:
+        record.INFO['coding'] = True
     return record
+
+
+def add_info_fields_to_header(vcf_reader):
+    """
+    PyVCF uses a vcf.Reader to get a header and output it when a
+    vcf.Writer is created. This function takes a Reader and adds
+    some INFO fields to its header so that it can be used as a
+    template for the vcf this program outputs.
+
+    Args:
+        vcf_reader (vcf.Reader): reader with a file whose header we
+            want to add INFO fields to
+
+    Returns:
+        vcf_reader (vcf.Reader): the same reader that was input, but
+            with some new INFO fields
+    """
+    vcf_reader.infos['affected_genes'] = vcf.parser._Info(
+        id='affected_genes',
+        num='.',
+        type='String',
+        desc='List of genes affected by this deletion',
+        source=None,
+        version=None,
+    )
+    vcf_reader.infos['intergenic'] = vcf.parser._Info(
+        id='intergenic',
+        num='0',
+        type='Flag',
+        desc='This deletion does not affect any genes',
+        source=None,
+        version=None,
+    )
+    vcf_reader.infos['regulatory'] = vcf.parser._Info(
+        id='regulatory',
+        num='0',
+        type='Flag',
+        desc='This deletion occurs directly up- or downstream of gene(s)',
+        source=None,
+        version=None,
+    )
+    vcf_reader.infos['intronic'] = vcf.parser._Info(
+        id='intronic',
+        num='0',
+        type='Flag',
+        desc='This deletion affects the introns of one or more genes',
+        source=None,
+        version=None,
+    )
+    vcf_reader.infos['coding'] = vcf.parser._Info(
+        id='coding',
+        num='0',
+        type='Flag',
+        desc='This deletion affects the coding sequence of one or more genes',
+        source=None,
+        version=None,
+    )
+    return vcf_reader
 
 
 def main():
     """ __main__ method for this file """
     args = parse_args()
 
-    writer = vcf.Writer(sys.stdout, args.vcf)
-    # TODO fix output header to add new fields
+    writer = vcf.Writer(sys.stdout, add_info_fields_to_header(args.vcf))
     for record in args.vcf:
         effects_tuple = get_deletion_effects(record, args.gff,
                                              args.regulatory_margin)
