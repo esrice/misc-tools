@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 import argparse
-import vcf
+import re
 import sys
+import vcf
 
 output_field_names = [
     'chromosome',
@@ -22,6 +23,8 @@ output_field_names = [
     'hgvs_p',
 ]
 
+annotation_re = re.compile("Functional annotations: '(.+)'")
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('vcf', help='The vcf file to convert to csv',
@@ -29,13 +32,29 @@ def parse_args():
     return parser.parse_args()
 
 def comma_join(fields):
-    return ','.join(fields)
+    """
+    Converts everything in the list to strings and then joins
+    them with commas.
+    """
+    return ','.join(map(str,fields))
+
+def make_annotation_dict(description):
+    """
+    Takes the 'desc' string of the ANN info header, as constructed by
+    SNPeff, and builds a dictionary mapping each field name to its
+    index.
+    """
+    annotation_dict = {}
+    match = annotation_re.match(description)
+    for i, field in map(str.strip, match.group(1).split('|')):
+        annotation_dict[field] = i
+    return annotation_dict
 
 def main():
     args = parse_args()
 
     # make dictionary of ANN field name to index
-    vcf.infos['ANN'].desc
+    annotation_field_names = make_annotation_dict(vcf.infos['ANN'].desc)
 
     output_field_names += args.vcf.samples
     print(','.join(output_field_names))  # header
@@ -52,6 +71,17 @@ def main():
             record.INFO['AC'],
             record.INFO['AN'],
         ]))
+        ann_fields = record.INFO['ANN'].split('|')
+        output_fields += [
+            ann_fields[ann_field_names['Gene_Name']],
+            'seq_ontology',
+            'gene_region',
+            'effect',
+            'transcript_name',
+            'exon_number',
+            'hgvs_c',
+            'hgvs_p',
+        ]
 
 
 if __name__ == '__main__':
