@@ -38,23 +38,13 @@ def comma_join(fields):
     """
     return ','.join(map(str,fields))
 
-def make_annotation_dict(description):
-    """
-    Takes the 'desc' string of the ANN info header, as constructed by
-    SNPeff, and builds a dictionary mapping each field name to its
-    index.
-    """
-    annotation_dict = {}
-    match = annotation_re.match(description)
-    for i, field in map(str.strip, match.group(1).split('|')):
-        annotation_dict[field] = i
-    return annotation_dict
 
 def main():
     args = parse_args()
 
-    # make dictionary of ANN field name to index
-    annotation_field_names = make_annotation_dict(vcf.infos['ANN'].desc)
+    # make list of ANN sub-field names
+    ann_field_names = list(map(str.strip, annotation_re.match(
+        vcf.infos['ANN'].desc).group(1).split('|')))
 
     output_field_names += args.vcf.samples
     print(','.join(output_field_names))  # header
@@ -71,17 +61,20 @@ def main():
             record.INFO['AC'],
             record.INFO['AN'],
         ]))
-        ann_fields = record.INFO['ANN'].split('|')
-        output_fields += [
-            ann_fields[ann_field_names['Gene_Name']],
-            'seq_ontology',
-            'gene_region',
-            'effect',
-            'transcript_name',
-            'exon_number',
-            'hgvs_c',
-            'hgvs_p',
-        ]
+        ann_fields = dict(zip(
+            ann_field_names,
+            record.INFO['ANN'][0].split('|')
+        ))
+        output_fields += [ann_fields[n] for n in [
+            'Gene_Name',
+            'Annotation',
+            'gene_region',  # TODO
+            'effect',  # TODO
+            'transcript_name',  # TODO
+            'exon_number',  # TODO
+            'HGVS.c',
+            'HGVS.p',
+        ]]
 
 
 if __name__ == '__main__':
