@@ -1,46 +1,51 @@
 #!/usr/bin/env python3
 """
-Given a list of gene symbols and a gff annotation of a genome, outputs
-the coordinates for each gene in the list.
+Given a list of gene symbols and an ensembl gtf annotation of a genome,
+outputs the coordinates for each gene in the list.
 """
 
 import argparse
+import collections
 import os.path
+import re
 
-import gffutils
-
+attribute_regex = re.compile('(.+) "(.+)"')
 
 def genes_list_type(file_location):
     """
     Parses a file containing a list of gene symbols, one per line, and
-    yields each gene symbol string
+    returns a list of the symbols as strings
     """
+    gene_symbols = []
     with open(file_location, 'r') as genes_list_file:
         for line in genes_list_file:
-            yield line.strip()
+            gene_symbols.append(line.strip())
 
 
-def gff_type(file_location):
+def parse_attributes(attributes_string):
+    attributes_dict = {}
+    # skip the last split because they all end with ';'
+    for attribute in attributes_string.split(';')[:-1]:
+        match = attribute_regex.match(attribute)
+        attributes_dict[match.group(1)] =  match.group(2)
+    return attributes_dict
+
+
+def parse_gtf_line(gtf_line):
+    fields = line.strip().split('\t')
+    chrom, feature_type = fields[0], fields[2]
+    start_position, end_position = int(fields[3]), int(fields[4])
+    attributes = parse_attributes(fields[8])
+
+
+def gtf_type(file_location):
     """
-    Given the path to a gff, check whether a gffutils database for this
-    file exists yet. If so, open that database and return it; if not,
-    create a new database at '{file_location}.symbol.db' indexed by
-    gene symbol and return it.
+    Given the path to an ensembl-style gtf, parse it and yield each
+    line as a Feature object
     """
-    db_path = '{}.symbol.db'.format(file_location)
-    if os.path.exists(db_path):
-        return gffutils.FeatureDB(db_path)
-    else:
-        # TODO this may require different options depending on which
-        # reference versions we end up using, as nobody follows the
-        # GFF specification correctly
-        return gffutils.create_db(
-            file_location,
-            db_path,
-            id_spec='symbol',
-            keep_order=False,              # these two lines are not important
-            sort_attribute_order=False,    # but speed up the database creation
-        )
+    with open(file_location, 'r') as gtf_file:
+        for line in gtf_file:
+            yield parse_gtf_line(line)
 
 
 def parse_args():
@@ -49,8 +54,8 @@ def parse_args():
         'genes_list', type=genes_list_type,
         help='file containing a list of gene symbols, one per line')
     parser.add_argument(
-        'gff', type=gff_type,
-        help='path to gff file containing coordinates of genes')
+        'gtf', type=gtf_type,
+        help='path to ensembl-style gtf file containing coordinates of genes')
     return parser.parse_args()
 
 
