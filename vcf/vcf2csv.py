@@ -122,9 +122,9 @@ def main():
             # add this genotype to the list of sample genotypes to be
             # output jointly
             if genotype.called:
-                sample_fields += genotype.gt_bases
+                sample_fields.append(genotype.gt_bases)
             else:
-                sample_fields += './.'
+                sample_fields.append('./.')
 
         # write a line for this variant in the joint output
         print(comma_join(output_fields + sample_fields), file=joint_outfile)
