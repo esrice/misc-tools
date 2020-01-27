@@ -30,6 +30,7 @@ default_ignore_annotations = [
     'non_coding_transcript_exon_variant',
     'downstream_gene_variant',
     'upstream_gene_variant',
+    'synonymous_variant',
 ]
 
 
