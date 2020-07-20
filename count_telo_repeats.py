@@ -12,14 +12,23 @@ from scipy.stats import binom
 import screed
 
 
-telomeric_repeat = re.compile('TTAGGG', re.IGNORECASE)
+telomeric_repeat = re.compile("TTAGGG", re.IGNORECASE)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('-b', '--bases', type=int, default='1000',
-                        help='number of bases at end of sequence to search')
-    parser.add_argument('fasta', type=screed.open, help='fasta file '
-                        'containing sequences to search for telomeres')
+    parser.add_argument(
+        "-b",
+        "--bases",
+        type=int,
+        default="1000",
+        help="number of bases at end of sequence to search",
+    )
+    parser.add_argument(
+        "fasta",
+        type=screed.open,
+        help="fasta file " "containing sequences to search for telomeres",
+    )
     return parser.parse_args()
 
 
@@ -32,14 +41,14 @@ def count_telo_repeats(seq_to_count):
 
 def main():
     args = parse_args()
-    p_TTAGGG = 0.25**6
+    p_TTAGGG = 0.25 ** 6
 
-    print('\t'.join(['seq_name', 'telo_repeat_count', 'p_val']))
+    print("\t".join(["seq_name", "telo_repeat_count", "p_val"]))
     for seq in args.fasta:
-        num_repeats = count_telo_repeats(seq.sequence[-1*args.bases:])
+        num_repeats = count_telo_repeats(seq.sequence[-1 * args.bases :])
         p = 1.0 - binom.cdf(num_repeats, args.bases, p_TTAGGG)
-        print('\t'.join(map(str, [seq.name, num_repeats, p])))
+        print("\t".join(map(str, [seq.name, num_repeats, p])))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

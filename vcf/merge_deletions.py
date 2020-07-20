@@ -10,15 +10,27 @@ import sys
 
 import vcf
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('-r', '--reciprocal-overlap', type=float, default=0.5,
-                        help='minimum reciprocal overlap to consider a '
-                        'deletion in both files to be the same deletion [0.5]')
-    parser.add_argument('vcf1', help='the first vcf file to merge',
-                        type=lambda f: vcf.Reader(filename=f))
-    parser.add_argument('vcf2', help='the second vcf file to merge',
-                        type=lambda f: vcf.Reader(filename=f))
+    parser.add_argument(
+        "-r",
+        "--reciprocal-overlap",
+        type=float,
+        default=0.5,
+        help="minimum reciprocal overlap to consider a "
+        "deletion in both files to be the same deletion [0.5]",
+    )
+    parser.add_argument(
+        "vcf1",
+        help="the first vcf file to merge",
+        type=lambda f: vcf.Reader(filename=f),
+    )
+    parser.add_argument(
+        "vcf2",
+        help="the second vcf file to merge",
+        type=lambda f: vcf.Reader(filename=f),
+    )
     return parser.parse_args()
 
 
@@ -39,10 +51,9 @@ def compare_records(record1, record2, contig_index):
     if record1.CHROM != record2.CHROM:
         return contig_index[record1.CHROM] - contig_index[record2.CHROM]
     else:
-        if ((record1.POS >= record2.POS
-             and record1.POS <= record2.sv_end)
-            or (record1.sv_end >= record2.POS
-                and record1.sv_end <= record2.sv_end)):
+        if (record1.POS >= record2.POS and record1.POS <= record2.sv_end) or (
+            record1.sv_end >= record2.POS and record1.sv_end <= record2.sv_end
+        ):
             return 0
         else:
             return record1.POS - record2.POS
@@ -78,10 +89,12 @@ def reciprocal_overlap(record1, record2, min_reciprocal_overlap=0.5):
     overlap_start = max(record1.POS, record2.POS)
     overlap_end = min(record1.sv_end, record2.sv_end)
     overlap_size = overlap_end - overlap_start
-    reciprocal_overlap = min(overlap_size/r1_deletion_size,
-                             overlap_size/r2_deletion_size)
+    reciprocal_overlap = min(
+        overlap_size / r1_deletion_size, overlap_size / r2_deletion_size
+    )
 
     return reciprocal_overlap
+
 
 def call_type_key(call):
     if call.gt_type is None:
@@ -90,7 +103,9 @@ def call_type_key(call):
         return call.gt_type
 
 
-CallData = vcf.model.make_calldata_tuple(['GT'])
+CallData = vcf.model.make_calldata_tuple(["GT"])
+
+
 def merge_calls(call1, call2):
     """
     Given two calls on the same sample, outputs a new call with the
@@ -101,15 +116,16 @@ def merge_calls(call1, call2):
     site = call1.site.
     """
     return vcf.model._Call(
-            call1.site,
-            call1.sample,
-            CallData(min(call1, call2, key=call_type_key).data.GT),
-            )
+        call1.site,
+        call1.sample,
+        CallData(min(call1, call2, key=call_type_key).data.GT),
+    )
 
 
 def make_sample_index_key(sample_index):
     def sample_index_key(call):
         return sample_index[call.sample]
+
     return sample_index_key
 
 
@@ -133,28 +149,28 @@ def merge_records(record1, record2, sample_index_key):
     # figure out which record is bigger, so that we can use it as the
     # template for the new record
     small_record, big_record = sorted(
-            [record1, record2],
-            key=lambda r: r.sv_end - r.POS
+        [record1, record2], key=lambda r: r.sv_end - r.POS
     )
 
     # sort the calls by sample index, and then merge each pair of calls
     # for the same sample into a single call
-    big_record.samples = list(starmap(
-        merge_calls, zip(
-            sorted(big_record.samples, key=sample_index_key),
-            sorted(small_record.samples, key=sample_index_key),
+    big_record.samples = list(
+        starmap(
+            merge_calls,
+            zip(
+                sorted(big_record.samples, key=sample_index_key),
+                sorted(small_record.samples, key=sample_index_key),
+            ),
         )
-    ))
-    big_record.FORMAT = 'GT'
+    )
+    big_record.FORMAT = "GT"
 
     return big_record
 
 
 def merge_all_deletions(reader1, reader2, min_reciprocal_overlap=0.5):
     # god help us if the VCFs have headers in different orders
-    contig_index = {k: i for i, k in enumerate(reversed(
-        reader1.contigs.keys()
-    ))}
+    contig_index = {k: i for i, k in enumerate(reversed(reader1.contigs.keys()))}
 
     # keep the samples in the order in which they appear in the reader1
     # header
@@ -182,13 +198,11 @@ def main():
 
     writer = vcf.Writer(sys.stdout, args.vcf1)
     # TODO fix output header
-    for record in merge_all_deletions(args.vcf1, args.vcf2,
-                                      args.reciprocal_overlap):
+    for record in merge_all_deletions(args.vcf1, args.vcf2, args.reciprocal_overlap):
         writer.write_record(record)
         writer.flush()
     writer.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

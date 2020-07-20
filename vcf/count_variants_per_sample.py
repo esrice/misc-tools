@@ -8,10 +8,12 @@ import collections
 
 import vcf
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('vcf', help='the vcf file to analyze',
-                        type=lambda f: vcf.Reader(filename=f))
+    parser.add_argument(
+        "vcf", help="the vcf file to analyze", type=lambda f: vcf.Reader(filename=f)
+    )
     return parser.parse_args()
 
 
@@ -30,14 +32,22 @@ def main():
                 else:
                     hom_alt_counts[call.sample] += 1
 
-    print('\t'.join(['sample', 'call_count', 'hom_alt_count', 'het_count']))
+    print("\t".join(["sample", "call_count", "hom_alt_count", "het_count"]))
     for sample in call_counts.keys():
-        print('\t'.join(map(str, [sample,
-                                  call_counts[sample],
-                                  hom_alt_counts[sample],
-                                  het_counts[sample],
-                                 ])))
+        print(
+            "\t".join(
+                map(
+                    str,
+                    [
+                        sample,
+                        call_counts[sample],
+                        hom_alt_counts[sample],
+                        het_counts[sample],
+                    ],
+                )
+            )
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

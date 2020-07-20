@@ -7,11 +7,17 @@ import sys
 
 import screed
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('seqfiles', type=screed.open, nargs='+',
-                        help='fasta/q[.gz] file(s) containing sequences')
+    parser.add_argument(
+        "seqfiles",
+        type=screed.open,
+        nargs="+",
+        help="fasta/q[.gz] file(s) containing sequences",
+    )
     return parser.parse_args()
+
 
 def main():
     args = parse_args()
@@ -31,5 +37,6 @@ def main():
             print(l)
             sys.exit()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

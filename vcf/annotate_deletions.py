@@ -21,32 +21,41 @@ def gff_type(gff_path):
     a database if one does not yet exist, and then returns that
     database.
     """
-    db_path = gff_path + '.db'
-    if gff_path.split('.')[-1] == 'db':
+    db_path = gff_path + ".db"
+    if gff_path.split(".")[-1] == "db":
         return gffutils.FeatureDB(gff_path)
     elif os.path.exists(db_path):
         return gffutils.FeatureDB(db_path)
     else:
-        print('Creating gff db...', file=sys.stderr)
+        print("Creating gff db...", file=sys.stderr)
         return gffutils.create_db(
             gff_path,
             db_path,
             # the id_spec is necessary because NCBI gff's do not follow
             # the GFF specification
-            id_spec={'gene': 'db_xref'}
+            id_spec={"gene": "db_xref"},
         )
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('-r', '--regulatory-margin', type=int, default=2000,
-                        help='distance up/downstream of a gene to consider '
-                        'as affecting that gene, in bp [2000]')
-    parser.add_argument('vcf', help='the vcf file to annotate',
-                        type=lambda f: vcf.Reader(filename=f))
-    parser.add_argument('gff', help='annotations of the reference genome, '
-                        'either in NCBI gff or a pre-created sqlite db',
-                        type=gff_type)
+    parser.add_argument(
+        "-r",
+        "--regulatory-margin",
+        type=int,
+        default=2000,
+        help="distance up/downstream of a gene to consider "
+        "as affecting that gene, in bp [2000]",
+    )
+    parser.add_argument(
+        "vcf", help="the vcf file to annotate", type=lambda f: vcf.Reader(filename=f)
+    )
+    parser.add_argument(
+        "gff",
+        help="annotations of the reference genome, "
+        "either in NCBI gff or a pre-created sqlite db",
+        type=gff_type,
+    )
     return parser.parse_args()
 
 
@@ -73,14 +82,14 @@ def get_deletion_effects(deletion_record, gff_db, regulatory_margin=2000):
     features_in_deletion = gff_db.region(
         seqid=deletion_record.CHROM,
         start=deletion_record.POS,
-        end=deletion_record.sv_end
+        end=deletion_record.sv_end,
     )
     for feature in features_in_deletion:
-        if feature.featuretype == 'gene':
-            affected_genes.add(feature.attributes['Name'][0].upper())
+        if feature.featuretype == "gene":
+            affected_genes.add(feature.attributes["Name"][0].upper())
             intergenic = False
             intronic = True
-        elif feature.featuretype == 'CDS':
+        elif feature.featuretype == "CDS":
             coding = True
             intronic = False
 
@@ -89,7 +98,7 @@ def get_deletion_effects(deletion_record, gff_db, regulatory_margin=2000):
         gff_db.region(
             seqid=deletion_record.CHROM,
             start=deletion_record.POS - regulatory_margin,
-            end=deletion_record.POS
+            end=deletion_record.POS,
         ),
         gff_db.region(
             seqid=deletion_record.CHROM,
@@ -98,8 +107,8 @@ def get_deletion_effects(deletion_record, gff_db, regulatory_margin=2000):
         ),
     )
     for feature in features_near_deletion:
-        if feature.featuretype == 'gene':
-            gene_name = feature.attributes['Name'][0].upper()
+        if feature.featuretype == "gene":
+            gene_name = feature.attributes["Name"][0].upper()
             # only consider this a deletion of a regulatory region if
             # this gene has not been otherwise affected
             if gene_name not in affected_genes:
@@ -110,20 +119,19 @@ def get_deletion_effects(deletion_record, gff_db, regulatory_margin=2000):
     return affected_genes, intergenic, regulatory, intronic, coding
 
 
-def annotate_deletion(record, affected_genes, intergenic, regulatory,
-                      intronic, coding):
+def annotate_deletion(record, affected_genes, intergenic, regulatory, intronic, coding):
     """ adds INFO fields to a vcf record """
-    record.INFO['affected_genes'] = list(affected_genes)
+    record.INFO["affected_genes"] = list(affected_genes)
     # all these if statements are necessary because pyvcf adds
     # unnecessary semicolons for false flags and empty fields
     if intergenic:
-        record.INFO['intergenic'] = True
+        record.INFO["intergenic"] = True
     if regulatory:
-        record.INFO['regulatory'] = True
+        record.INFO["regulatory"] = True
     if intronic:
-        record.INFO['intronic'] = True
+        record.INFO["intronic"] = True
     if coding:
-        record.INFO['coding'] = True
+        record.INFO["coding"] = True
     return record
 
 
@@ -142,43 +150,43 @@ def add_info_fields_to_header(vcf_reader):
         vcf_reader (vcf.Reader): the same reader that was input, but
             with some new INFO fields
     """
-    vcf_reader.infos['affected_genes'] = vcf.parser._Info(
-        id='affected_genes',
-        num='.',
-        type='String',
-        desc='List of genes affected by this deletion',
+    vcf_reader.infos["affected_genes"] = vcf.parser._Info(
+        id="affected_genes",
+        num=".",
+        type="String",
+        desc="List of genes affected by this deletion",
         source=None,
         version=None,
     )
-    vcf_reader.infos['intergenic'] = vcf.parser._Info(
-        id='intergenic',
-        num='0',
-        type='Flag',
-        desc='This deletion does not affect any genes',
+    vcf_reader.infos["intergenic"] = vcf.parser._Info(
+        id="intergenic",
+        num="0",
+        type="Flag",
+        desc="This deletion does not affect any genes",
         source=None,
         version=None,
     )
-    vcf_reader.infos['regulatory'] = vcf.parser._Info(
-        id='regulatory',
-        num='0',
-        type='Flag',
-        desc='This deletion occurs directly up- or downstream of gene(s)',
+    vcf_reader.infos["regulatory"] = vcf.parser._Info(
+        id="regulatory",
+        num="0",
+        type="Flag",
+        desc="This deletion occurs directly up- or downstream of gene(s)",
         source=None,
         version=None,
     )
-    vcf_reader.infos['intronic'] = vcf.parser._Info(
-        id='intronic',
-        num='0',
-        type='Flag',
-        desc='This deletion affects the introns of one or more genes',
+    vcf_reader.infos["intronic"] = vcf.parser._Info(
+        id="intronic",
+        num="0",
+        type="Flag",
+        desc="This deletion affects the introns of one or more genes",
         source=None,
         version=None,
     )
-    vcf_reader.infos['coding'] = vcf.parser._Info(
-        id='coding',
-        num='0',
-        type='Flag',
-        desc='This deletion affects the coding sequence of one or more genes',
+    vcf_reader.infos["coding"] = vcf.parser._Info(
+        id="coding",
+        num="0",
+        type="Flag",
+        desc="This deletion affects the coding sequence of one or more genes",
         source=None,
         version=None,
     )
@@ -191,13 +199,11 @@ def main():
 
     writer = vcf.Writer(sys.stdout, add_info_fields_to_header(args.vcf))
     for record in args.vcf:
-        effects_tuple = get_deletion_effects(record, args.gff,
-                                             args.regulatory_margin)
+        effects_tuple = get_deletion_effects(record, args.gff, args.regulatory_margin)
         annotated_record = annotate_deletion(record, *effects_tuple)
         writer.write_record(annotated_record)
     writer.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

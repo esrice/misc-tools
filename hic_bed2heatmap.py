@@ -8,25 +8,40 @@ import argparse
 
 import pandas as pd
 import matplotlib as mpl
-mpl.use('Agg')
+
+mpl.use("Agg")
 import matplotlib.pyplot as plt
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('-b', '--num-bins', type=int, default=500,
-                        help='Number of bins to use for heatmap')
-    parser.add_argument('-o', '--output', default='heat.png',
-                        help='Place to put output plot [heat.png]')
-    parser.add_argument('-j', '--juicer', action='store_true',
-                        help="input is in juicer rather than bed format")
-    parser.add_argument('bed_file', type=argparse.FileType('r'),
-                        help='Bed file containing the mapping coordinates of '
-                        'Hi-C reads')
     parser.add_argument(
-        'contigs_list', type=argparse.FileType('r'),
-        help='list of contigs to make a heatmap of. Must be a tsv '
-        'file with three columns: contig name; orientation; size in bp')
+        "-b",
+        "--num-bins",
+        type=int,
+        default=500,
+        help="Number of bins to use for heatmap",
+    )
+    parser.add_argument(
+        "-o", "--output", default="heat.png", help="Place to put output plot [heat.png]"
+    )
+    parser.add_argument(
+        "-j",
+        "--juicer",
+        action="store_true",
+        help="input is in juicer rather than bed format",
+    )
+    parser.add_argument(
+        "bed_file",
+        type=argparse.FileType("r"),
+        help="Bed file containing the mapping coordinates of " "Hi-C reads",
+    )
+    parser.add_argument(
+        "contigs_list",
+        type=argparse.FileType("r"),
+        help="list of contigs to make a heatmap of. Must be a tsv "
+        "file with three columns: contig name; orientation; size in bp",
+    )
     return parser.parse_args()
 
 
@@ -60,9 +75,9 @@ def contig_to_heat_coord(contig_name, contig_coord, contigs, contigs_index):
         return None
 
     contig_row = contigs.loc[index]
-    if contig_row['orientation'] == '+':
-        return contig_row['start'] + contig_coord
-    return contig_row['start'] + contig_row['size'] - contig_coord
+    if contig_row["orientation"] == "+":
+        return contig_row["start"] + contig_coord
+    return contig_row["start"] + contig_row["size"] - contig_coord
 
 
 def heat_coords_from_bed(bed_file, contigs, contigs_index):
@@ -73,21 +88,21 @@ def heat_coords_from_bed(bed_file, contigs, contigs_index):
     # loop through the bed file
     heat_coords_x = []
     heat_coords_y = []
-    last_contig, last_start, _, last_read_name = '', -1, -1, ''
+    last_contig, last_start, _, last_read_name = "", -1, -1, ""
     for line in bed_file:
         contig, start, end, read_name, _, _ = line.strip().split()
         start, end = int(start), int(end)
 
         # if the current read is a forward one, just store it
         # in anticipation of its reverse partner
-        if read_name.endswith('/1'):
+        if read_name.endswith("/1"):
             last_contig, last_start = contig, start
             last_read_name = read_name
         elif read_name[:-2] == last_read_name[:-2]:
-            last_coord = contig_to_heat_coord(last_contig, last_start,
-                                              contigs, contigs_index)
-            this_coord = contig_to_heat_coord(contig, start,
-                                              contigs, contigs_index)
+            last_coord = contig_to_heat_coord(
+                last_contig, last_start, contigs, contigs_index
+            )
+            this_coord = contig_to_heat_coord(contig, start, contigs, contigs_index)
 
             if last_coord is not None and this_coord is not None:
                 heat_coords_x.append(last_coord)
@@ -106,10 +121,12 @@ def heat_coords_from_juicer(juicer_file, contigs, contigs_index):
         contig1, contig1_start = splits[1], int(splits[2])
         contig2, contig2_start = splits[5], int(splits[6])
 
-        heat_coord1 = contig_to_heat_coord(contig1, contig1_start,
-                                           contigs, contigs_index)
-        heat_coord2 = contig_to_heat_coord(contig2, contig2_start,
-                                           contigs, contigs_index)
+        heat_coord1 = contig_to_heat_coord(
+            contig1, contig1_start, contigs, contigs_index
+        )
+        heat_coord2 = contig_to_heat_coord(
+            contig2, contig2_start, contigs, contigs_index
+        )
 
         if heat_coord1 is not None and heat_coord2 is not None:
             heat_coords_x.append(heat_coord1)
@@ -124,30 +141,37 @@ def main():
     args = parse_args()
 
     # make a data frame with the contigs info in it
-    contigs = pd.DataFrame(read_contigs_list(args.contigs_list),
-                           columns=['name', 'orientation', 'size', 'start'])
+    contigs = pd.DataFrame(
+        read_contigs_list(args.contigs_list),
+        columns=["name", "orientation", "size", "start"],
+    )
 
     # make a dictionary mapping the contig name to its index in the data frame
-    contigs_index = {row['name']: i for i, row in contigs.iterrows()}
+    contigs_index = {row["name"]: i for i, row in contigs.iterrows()}
 
     if args.juicer:
         heat_coords_x, heat_coords_y = heat_coords_from_juicer(
-            args.bed_file, contigs, contigs_index)
+            args.bed_file, contigs, contigs_index
+        )
     else:
         heat_coords_x, heat_coords_y = heat_coords_from_bed(
-            args.bed_file, contigs, contigs_index)
+            args.bed_file, contigs, contigs_index
+        )
 
     fig, ax = plt.subplots()
-    ax.hist2d(heat_coords_x, heat_coords_y, cmap=plt.cm.Reds,
-              norm=mpl.colors.LogNorm(), bins=(args.num_bins, args.num_bins))
-    ax.set_aspect('equal', 'box')
+    ax.hist2d(
+        heat_coords_x,
+        heat_coords_y,
+        cmap=plt.cm.Reds,
+        norm=mpl.colors.LogNorm(),
+        bins=(args.num_bins, args.num_bins),
+    )
+    ax.set_aspect("equal", "box")
     for i, contig in contigs.iterrows():
-        ax.axvline(x=contig['start'], linestyle='--', color='grey',
-                   linewidth=1)
-        ax.axhline(y=contig['start'], linestyle='--', color='grey',
-                   linewidth=1)
-    plt.xticks(contigs['start'], contigs['name'], rotation='vertical')
-    plt.yticks(contigs['start'], contigs['name'])
+        ax.axvline(x=contig["start"], linestyle="--", color="grey", linewidth=1)
+        ax.axhline(y=contig["start"], linestyle="--", color="grey", linewidth=1)
+    plt.xticks(contigs["start"], contigs["name"], rotation="vertical")
+    plt.yticks(contigs["start"], contigs["name"])
     plt.savefig(args.output)
 
 
