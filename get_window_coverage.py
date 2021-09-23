@@ -3,6 +3,9 @@
 """
 Use the output of samtools mpileup to calculate the average coverage
 per window.
+
+Example full usage:
+samtools mpileup -f ref.fa -q30 aligned.bam | get_window_coverage.py > windows.tsv
 """
 
 import argparse
